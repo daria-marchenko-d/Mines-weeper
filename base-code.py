@@ -13,6 +13,13 @@ class Demineur:
         }
         self.start_time = None
         self.running = False
+
+        # Initialiser les attributs nécessaires
+        self.first_click = True
+        self.board = []
+        self.flags_count = 0
+        self.question_marks_count = 0
+
         self.create_menu()
 
     def create_menu(self):
@@ -21,16 +28,25 @@ class Demineur:
             self.game_frame.destroy()  # Détruire le cadre de jeu s'il existe
 
         self.menu_frame = tk.Frame(self.root)
-        self.menu_frame.pack()
+        self.menu_frame.pack(fill=tk.BOTH, expand=True)
 
-        tk.Label(self.menu_frame, text="Choisissez la difficulté :").pack()
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+
+        tk.Label(self.menu_frame, text="Choisissez la difficulté :").pack(pady=20)
         for level in self.difficulty:
-            tk.Button(self.menu_frame, text=level, command=lambda l=level: self.start_game(l)).pack()
+            tk.Button(self.menu_frame, text=level, command=lambda l=level: self.start_game(l)).pack(pady=10)
 
     def start_game(self, level):
         """Démarre une nouvelle partie avec le niveau choisi."""
         self.level = level
         self.rows, self.cols, self.mines_count = self.difficulty[level]
+
+        # Réinitialiser les attributs pour une nouvelle partie
+        self.first_click = True
+        self.board = [[None for _ in range(self.cols)] for _ in range(self.rows)]
+        self.flags_count = 0
+        self.question_marks_count = 0
 
         if hasattr(self, "menu_frame"):
             self.menu_frame.destroy()
@@ -38,44 +54,64 @@ class Demineur:
             self.game_frame.destroy()
 
         self.game_frame = tk.Frame(self.root)
-        self.game_frame.pack()
+        self.game_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Configurer les poids pour rendre le cadre responsive
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+        self.game_frame.grid_rowconfigure(2, weight=1)
+        self.game_frame.grid_columnconfigure(0, weight=1)
 
         self.timer_label = tk.Label(self.game_frame, text="Temps: 0s")
-        self.timer_label.grid(row=0, column=0, columnspan=self.cols)
+        self.timer_label.grid(row=0, column=0, columnspan=self.cols, sticky="nsew")
+
+        # Configurer les colonnes pour les labels
+        self.game_frame.grid_columnconfigure(0, weight=1)  # Colonne pour "Mines"
+        self.game_frame.grid_columnconfigure(1, weight=1)  # Colonne pour "Drapeaux"
+        self.game_frame.grid_columnconfigure(2, weight=1)  # Colonne pour "Points d'interrogation"
 
         # Ajouter les labels pour les mines, drapeaux et points d'interrogation
-        self.mines_label = tk.Label(self.game_frame, text=f"Mines: {self.mines_count}")
-        self.mines_label.grid(row=1, column=0, columnspan=self.cols // 3)
+        self.mines_label = tk.Label(self.game_frame, text=f"Mines: {self.mines_count}", anchor="center")
+        self.mines_label.grid(row=1, column=0, sticky="nsew")
 
-        self.flags_label = tk.Label(self.game_frame, text="Drapeaux: 0")
-        self.flags_label.grid(row=1, column=self.cols // 3, columnspan=self.cols // 3)
+        self.flags_label = tk.Label(self.game_frame, text="Drapeaux: 0", anchor="center")
+        self.flags_label.grid(row=1, column=1, sticky="nsew")
 
-        self.questions_label = tk.Label(self.game_frame, text="Points d'interrogation: 0")
-        self.questions_label.grid(row=1, column=2 * (self.cols // 3), columnspan=self.cols // 3)
+        self.questions_label = tk.Label(self.game_frame, text="Points d'interrogation: 0", anchor="center")
+        self.questions_label.grid(row=1, column=2, sticky="nsew")
 
         self.restart_button = tk.Button(self.game_frame, text="Réinitialiser", command=lambda: self.start_game(self.level))
-        self.restart_button.grid(row=0, column=self.cols - 1)
+        self.restart_button.grid(row=0, column=self.cols - 1, sticky="nsew")
 
         self.board_frame = tk.Frame(self.game_frame)
-        self.board_frame.grid(row=2, column=0, columnspan=self.cols)
+        self.board_frame.grid(row=2, column=0, columnspan=self.cols, sticky="nsew")
 
-        self.board = [[None for _ in range(self.cols)] for _ in range(self.rows)]
-        self.mines = set()
-        self.first_click = True
-        self.running = False
-        self.flags_count = 0
-        self.question_marks_count = 0
+        # Configurer les poids pour le plateau de jeu
+        for r in range(self.rows):
+            self.board_frame.grid_rowconfigure(r, weight=1)
+        for c in range(self.cols):
+            self.board_frame.grid_columnconfigure(c, weight=1)
 
+        # Créer les boutons du plateau de jeu
         for r in range(self.rows):
             for c in range(self.cols):
                 btn = tk.Button(self.board_frame, width=2, height=1, command=lambda x=r, y=c: self.reveal(x, y))
                 btn.bind("<Button-3>", lambda e, x=r, y=c: self.flag(x, y))
-                btn.grid(row=r, column=c)
+                btn.grid(row=r, column=c, sticky="nsew")
                 self.board[r][c] = {"btn": btn, "mine": False, "revealed": False, "flag": 0}
 
         # Ajouter un bouton "Retour" en bas des cases
         self.back_button = tk.Button(self.game_frame, text="Retour", command=self.create_menu)
-        self.back_button.grid(row=3, column=0, columnspan=self.cols)
+        self.back_button.grid(row=3, column=0, columnspan=self.cols, sticky="nsew")
+
+        # Configurer les poids pour les lignes et colonnes des labels
+        self.game_frame.grid_rowconfigure(1, weight=1)  # Ligne des labels
+        self.game_frame.grid_columnconfigure(0, weight=1)  # Colonne des labels
+        self.game_frame.grid_columnconfigure(1, weight=1)
+        self.game_frame.grid_columnconfigure(2, weight=1)
+
+        # Configurer la ligne du bouton "Retour" pour qu'elle soit responsive
+        self.game_frame.grid_rowconfigure(3, weight=1)
 
         self.update_timer()
 
