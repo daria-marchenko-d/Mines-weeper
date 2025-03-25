@@ -17,9 +17,12 @@ class Demineur:
 
     def create_menu(self):
         """Créer le menu de sélection du niveau."""
+        if hasattr(self, "game_frame"):
+            self.game_frame.destroy()  # Détruire le cadre de jeu s'il existe
+
         self.menu_frame = tk.Frame(self.root)
         self.menu_frame.pack()
-        
+
         tk.Label(self.menu_frame, text="Choisissez la difficulté :").pack()
         for level in self.difficulty:
             tk.Button(self.menu_frame, text=level, command=lambda l=level: self.start_game(l)).pack()
@@ -50,10 +53,6 @@ class Demineur:
         self.questions_label = tk.Label(self.game_frame, text="Points d'interrogation: 0")
         self.questions_label.grid(row=1, column=2 * (self.cols // 3), columnspan=self.cols // 3)
 
-        # Ajouter un bouton "Retour"
-        self.back_button = tk.Button(self.game_frame, text="Retour", command=self.create_menu)
-        self.back_button.grid(row=0, column=self.cols - 2)
-
         self.restart_button = tk.Button(self.game_frame, text="Réinitialiser", command=lambda: self.start_game(self.level))
         self.restart_button.grid(row=0, column=self.cols - 1)
 
@@ -70,9 +69,13 @@ class Demineur:
         for r in range(self.rows):
             for c in range(self.cols):
                 btn = tk.Button(self.board_frame, width=2, height=1, command=lambda x=r, y=c: self.reveal(x, y))
-                btn.bind("<Button-3>", lambda e, x=r, y=c: self.flag(x, y))  # Correction ici
+                btn.bind("<Button-3>", lambda e, x=r, y=c: self.flag(x, y))
                 btn.grid(row=r, column=c)
                 self.board[r][c] = {"btn": btn, "mine": False, "revealed": False, "flag": 0}
+
+        # Ajouter un bouton "Retour" en bas des cases
+        self.back_button = tk.Button(self.game_frame, text="Retour", command=self.create_menu)
+        self.back_button.grid(row=3, column=0, columnspan=self.cols)
 
         self.update_timer()
 
