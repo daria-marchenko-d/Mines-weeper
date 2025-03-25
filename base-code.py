@@ -50,6 +50,10 @@ class Demineur:
         self.questions_label = tk.Label(self.game_frame, text="Points d'interrogation: 0")
         self.questions_label.grid(row=1, column=2 * (self.cols // 3), columnspan=self.cols // 3)
 
+        # Ajouter un bouton "Retour"
+        self.back_button = tk.Button(self.game_frame, text="Retour", command=self.create_menu)
+        self.back_button.grid(row=0, column=self.cols - 2)
+
         self.restart_button = tk.Button(self.game_frame, text="Réinitialiser", command=lambda: self.start_game(self.level))
         self.restart_button.grid(row=0, column=self.cols - 1)
 
