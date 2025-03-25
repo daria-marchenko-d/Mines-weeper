@@ -133,19 +133,23 @@ class Demineur:
             return
 
         current_flag = self.board[r][c]["flag"]
-        self.board[r][c]["flag"] = (current_flag + 1) % 3
-        symbols = ["", "🚩", "?"]
-        self.board[r][c]["btn"].config(text=symbols[self.board[r][c]["flag"]])
+        new_flag = (current_flag + 1) % 3  # Cycle entre 0 (vide), 1 (drapeau), 2 (point d'interrogation)
+        self.board[r][c]["flag"] = new_flag
 
-        # Mettre à jour les compteurs de drapeaux et de points d'interrogation
-        if current_flag == 0:  # Passer de vide à drapeau
+        # Mettre à jour le texte du bouton
+        symbols = ["", "🚩", "?"]
+        self.board[r][c]["btn"].config(text=symbols[new_flag])
+
+        # Mettre à jour les compteurs
+        if current_flag == 0 and new_flag == 1:  # Vide → Drapeau
             self.flags_count += 1
-        elif current_flag == 1:  # Passer de drapeau à point d'interrogation
+        elif current_flag == 1 and new_flag == 2:  # Drapeau → Point d'interrogation
             self.flags_count -= 1
             self.question_marks_count += 1
-        elif current_flag == 2:  # Passer de point d'interrogation à vide
+        elif current_flag == 2 and new_flag == 0:  # Point d'interrogation → Vide
             self.question_marks_count -= 1
 
+        # Mettre à jour les labels
         self.update_labels()
 
     def check_win(self):
