@@ -39,17 +39,29 @@ class Demineur:
 
         self.timer_label = tk.Label(self.game_frame, text="Temps: 0s")
         self.timer_label.grid(row=0, column=0, columnspan=self.cols)
-        
+
+        # Ajouter les labels pour les mines, drapeaux et points d'interrogation
+        self.mines_label = tk.Label(self.game_frame, text=f"Mines: {self.mines_count}")
+        self.mines_label.grid(row=1, column=0, columnspan=self.cols // 3)
+
+        self.flags_label = tk.Label(self.game_frame, text="Drapeaux: 0")
+        self.flags_label.grid(row=1, column=self.cols // 3, columnspan=self.cols // 3)
+
+        self.questions_label = tk.Label(self.game_frame, text="Points d'interrogation: 0")
+        self.questions_label.grid(row=1, column=2 * (self.cols // 3), columnspan=self.cols // 3)
+
         self.restart_button = tk.Button(self.game_frame, text="Réinitialiser", command=lambda: self.start_game(self.level))
         self.restart_button.grid(row=0, column=self.cols - 1)
 
         self.board_frame = tk.Frame(self.game_frame)
-        self.board_frame.grid(row=1, column=0, columnspan=self.cols)
+        self.board_frame.grid(row=2, column=0, columnspan=self.cols)
 
         self.board = [[None for _ in range(self.cols)] for _ in range(self.rows)]
         self.mines = set()
         self.first_click = True
         self.running = False
+        self.flags_count = 0
+        self.question_marks_count = 0
 
         for r in range(self.rows):
             for c in range(self.cols):
@@ -120,9 +132,21 @@ class Demineur:
         if self.board[r][c]["revealed"]:
             return
 
-        self.board[r][c]["flag"] = (self.board[r][c]["flag"] + 1) % 3
+        current_flag = self.board[r][c]["flag"]
+        self.board[r][c]["flag"] = (current_flag + 1) % 3
         symbols = ["", "🚩", "?"]
         self.board[r][c]["btn"].config(text=symbols[self.board[r][c]["flag"]])
+
+        # Mettre à jour les compteurs de drapeaux et de points d'interrogation
+        if current_flag == 0:  # Passer de vide à drapeau
+            self.flags_count += 1
+        elif current_flag == 1:  # Passer de drapeau à point d'interrogation
+            self.flags_count -= 1
+            self.question_marks_count += 1
+        elif current_flag == 2:  # Passer de point d'interrogation à vide
+            self.question_marks_count -= 1
+
+        self.update_labels()
 
     def check_win(self):
         """Vérifie si toutes les cases non minées sont révélées."""
