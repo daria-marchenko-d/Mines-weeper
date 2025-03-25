@@ -175,6 +175,12 @@ class Demineur:
             self.timer_label.config(text=f"Temps: {elapsed_time}s")
         self.root.after(1000, self.update_timer)
 
+    def update_labels(self):
+        """Met à jour les labels des mines, drapeaux et points d'interrogation."""
+        self.flags_label.config(text=f"Drapeaux: {self.flags_count}")
+        self.questions_label.config(text=f"Points d'interrogation: {self.question_marks_count}")
+        self.mines_label.config(text=f"Mines: {self.mines_count - self.flags_count}")
+
 if __name__ == "__main__":
     root = tk.Tk()
     app = Demineur(root)
