@@ -66,7 +66,7 @@ class Demineur:
         for r in range(self.rows):
             for c in range(self.cols):
                 btn = tk.Button(self.board_frame, width=2, height=1, command=lambda x=r, y=c: self.reveal(x, y))
-                btn.bind("<Button-3>", lambda e, x=r, y=c: self.flag(x, y))
+                btn.bind("<Button-3>", lambda e, x=r, y=c: self.flag(x, y))  # Correction ici
                 btn.grid(row=r, column=c)
                 self.board[r][c] = {"btn": btn, "mine": False, "revealed": False, "flag": 0}
 
