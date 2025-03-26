@@ -3,11 +3,11 @@ import random
 import time
 import sys
 
-# Ініціалізація pygame
+# pygame initialization
 pygame.init()
 pygame.font.init()
 
-# Кольори
+# Colors
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 GRAY = (200, 200, 200)
@@ -50,6 +50,7 @@ class Cell:
         if self.is_revealed:
             if self.is_mine:
                 text = font.render("*", True, RED)
+
                 surface.blit(text, text.get_rect(center=self.rect.center))
             elif self.adjacent_mines > 0:
                 text = font.render(str(self.adjacent_mines), True, COLORS[self.adjacent_mines])
@@ -64,9 +65,18 @@ class Cell:
 class Minesweeper:
     def __init__(self):
         self.screen_width = 800
-        self.screen_height = 650  # Збільшено для інформаційної панелі
+        self.screen_height = 650
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption("Minesweeper")
+
+        # Add sounds and music
+        self.music = pygame.mixer.music.load("sounds/background.mp3")
+        self.fail_sound = pygame.mixer.Sound("sounds/failfare.mp3")
+        self.click_sound = pygame.mixer.Sound("sounds/click.mp3")
+        self.explosion_sound = pygame.mixer.Sound("sounds/explosion.mp3")
+        self.win_sound = pygame.mixer.Sound("sounds/fanfare.mp3")
+
+        pygame.mixer.music.play(-1)
         
         self.large_font = pygame.font.SysFont('Arial', 24)
         self.medium_font = pygame.font.SysFont('Arial', 20)
@@ -100,18 +110,18 @@ class Minesweeper:
         self.start_time = None
         self.victory = False
         
-        # Розрахунок розміру клітинок
+        # Set up game board
         max_cell_width = (self.screen_width - 40) // self.columns
         max_cell_height = (self.screen_height - 200) // self.rows
         self.cell_size = min(max_cell_width, max_cell_height, 40)
         
-        # Позиція ігрового поля
+        # Calculate board position
         board_width = self.columns * self.cell_size
         board_height = self.rows * self.cell_size
         self.board_x_position = (self.screen_width - board_width) // 2
         self.board_y_position = 150
         
-        # Створення клітинок
+        # Create cells
         self.cells = [
             Cell(
                 self.board_x_position + column * self.cell_size, 
@@ -123,8 +133,8 @@ class Minesweeper:
         ]
         
         self.game_state = "game"
-        self.restart_button = Button(650, 50, 100, 40, "Restart")
-        self.menu_button = Button(50, 50, 100, 40, "Menu")
+        self.restart_button = Button(650, 60, 100, 40, "Restart")
+        self.menu_button = Button(50, 60, 100, 40, "Menu")
 
     def place_mines(self, safe_row, safe_column):
         safe_index = safe_row * self.columns + safe_column
@@ -172,11 +182,14 @@ class Minesweeper:
         
         if cell.is_mine:
             self.end_game(False)
+            self.explosion_sound.play()
+            self.fail_sound.play()
         elif cell.adjacent_mines == 0:
             self.reveal_adjacent_cells(row, column)
         
         if self.check_win_condition():
             self.end_game(True)
+            self.win_sound.play()
 
     def reveal_adjacent_cells(self, row, column):
         for row_offset in [-1, 0, 1]:
@@ -220,18 +233,18 @@ class Minesweeper:
                 cell.is_revealed = True
 
     def draw_info_panel(self):
-        # Панель інформації
+        # Information panel
         pygame.draw.rect(self.screen, WHITE, (0, 0, self.screen_width, 80))
         
-        # Таймер
+        # Timer
         timer_text = f"Time: {int(time.time() - self.start_time)}s" if self.game_running else "Time: 0s"
         self.screen.blit(self.large_font.render(timer_text, True, BLACK), (50, 30))
         
-        # Кількість мін
+        # Mines left
         mines_text = f"Mines: {self.total_mines}"
         self.screen.blit(self.large_font.render(mines_text, True, BLACK), (300, 30))
         
-        # Залишилось прапорців
+        # Flags left
         flags_text = f"Flags: {self.remaining_flags}"
         self.screen.blit(self.large_font.render(flags_text, True, BLACK), (550, 30))
 
@@ -245,18 +258,18 @@ class Minesweeper:
     def draw_game(self):
         self.screen.fill(WHITE)
         
-        # Інформаційна панель
+        # Information panel
         self.draw_info_panel()
         
-        # Кнопки
+        # Buttons
         self.restart_button.draw(self.screen)
         self.menu_button.draw(self.screen)
         
-        # Ігрове поле
+        # Game board
         for cell in self.cells:
             cell.draw(self.screen, self.cell_font)
         
-        # Результат гри
+        # Game over screen
         if self.game_state == "game_over":
             result_text = "You Win!" if self.victory else "Game Over!"
             self.screen.blit(self.large_font.render(result_text, True, RED), (350, 100))
