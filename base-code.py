@@ -15,6 +15,12 @@ class Demineur:
         self.start_time = None
         self.running = False
 
+        # Couleurs pour les chiffres
+        self.colors = {
+            1: "blue", 2: "green", 3: "red", 4: "purple",
+            5: "maroon", 6: "turquoise", 7: "black", 8: "gray"
+        }
+
         # Initialiser les attributs nécessaires
         self.first_click = True
         self.board = []
@@ -24,7 +30,7 @@ class Demineur:
         self.create_menu()
 
     def create_menu(self):
-        """Créer le menu de sélection du niveau."""
+        """Créer le menu de sélection du niveau avec une image GIF animée."""
         if hasattr(self, "game_frame"):
             self.game_frame.destroy()  # Détruire le cadre de jeu s'il existe
 
@@ -34,9 +40,87 @@ class Demineur:
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
 
-        tk.Label(self.menu_frame, text="Choisissez la difficulté :").pack(pady=20)
-        for level in self.difficulty:
-            tk.Button(self.menu_frame, text=level, command=lambda l=level: self.start_game(l)).pack(pady=10)
+        # Ajouter une image GIF animée
+        try:
+            # Charger l'image depuis un fichier GIF
+            # Remplacez 'minesweeper_animation.gif' par le chemin de votre GIF
+            image_path = "images/accueille.gif"
+            
+            # Ouvrir le GIF et récupérer les frames (images)
+            gif = Image.open(image_path)
+            self.gif_frames = []
+            
+            try:
+                # Parcourir toutes les frames du GIF
+                frame_count = 0
+                while True:
+                    # Copier la frame actuelle
+                    gif.seek(frame_count)
+                    frame = gif.copy()
+                    
+                    # Redimensionner si nécessaire
+                    frame = frame.resize((250, 250), Image.LANCZOS)
+                    
+                    # Convertir pour Tkinter
+                    photoframe = ImageTk.PhotoImage(frame)
+                    self.gif_frames.append(photoframe)
+                    
+                    frame_count += 1
+            except EOFError:
+                # La fin du GIF a été atteinte
+                pass
+            
+            # Créer un label pour afficher le GIF
+            self.gif_label = tk.Label(self.menu_frame)
+            self.gif_label.pack(pady=20)
+            
+            # Fonction pour animer le GIF
+            def update_gif(frame_index=0):
+                if hasattr(self, "gif_frames") and self.gif_frames:
+                    # Mettre à jour l'image du label
+                    frame = self.gif_frames[frame_index]
+                    self.gif_label.configure(image=frame)
+                    
+                    # Calculer l'index de la prochaine frame (boucle circulaire)
+                    next_frame_index = (frame_index + 1) % len(self.gif_frames)
+                    
+                    # Planifier la mise à jour de la prochaine frame (100ms = 0.1s entre chaque frame)
+                    # Ajustez cette valeur pour modifier la vitesse de l'animation
+                    self.root.after(100, update_gif, next_frame_index)
+            
+            # Démarrer l'animation
+            update_gif()
+            
+            # Ajouter un titre
+            title_label = tk.Label(self.menu_frame, text="Démineur", font=("Arial", 24, "bold"))
+            title_label.pack(pady=10)
+        except Exception as e:
+            print(f"Erreur lors du chargement de l'image : {e}")
+            # Afficher uniquement le titre si l'image ne peut pas être chargée
+            title_label = tk.Label(self.menu_frame, text="Démineur", font=("Arial", 24, "bold"))
+            title_label.pack(pady=20)
+
+        # Reste du code comme avant...
+        # Texte d'instructions
+        tk.Label(self.menu_frame, text="Choisissez la difficulté :", font=("Arial", 14)).pack(pady=10)
+        
+        # Cadre pour les boutons de difficulté
+        buttons_frame = tk.Frame(self.menu_frame)
+        buttons_frame.pack(pady=10)
+        
+        # Boutons stylisés pour chaque niveau de difficulté
+        for i, level in enumerate(self.difficulty):
+            button = tk.Button(
+                buttons_frame, 
+                text=level, 
+                command=lambda l=level: self.start_game(l),
+                width=10,
+                height=2,
+                font=("Arial", 12),
+                relief=tk.RAISED,
+                bd=3
+            )
+            button.grid(row=0, column=i, padx=10)
 
     def start_game(self, level):
         """Démarre une nouvelle partie avec le niveau choisi."""
@@ -163,7 +247,11 @@ class Demineur:
         
         def show_next_stage(stage_index=0):
             if stage_index < len(cloud_stages):
-                btn.config(text=cloud_stages[stage_index])
+                if stage_index == len(cloud_stages) - 1:  # Dernière étape = chiffre
+                    # Appliquer la couleur correspondant au chiffre
+                    btn.config(text=cloud_stages[stage_index], fg=self.colors.get(mines_adj, "black"))
+                else:
+                    btn.config(text=cloud_stages[stage_index])
                 self.root.after(150, show_next_stage, stage_index + 1)
         
         show_next_stage()
@@ -175,19 +263,50 @@ class Demineur:
         explosion_stages = ["💣", "💥"]
         
         def show_explosion():
-            btn.config(text=explosion_stages[1], bg="red")
-            if not immediate:
-                # Si ce n'est pas la bombe cliquée directement, jouer un son serait approprié ici
+            # Vérifier si le widget existe toujours avant de le modifier
+            try:
+                btn.config(text=explosion_stages[1], bg="red")
+                if immediate:
+                    self.root.after(1000, lambda: self.reveal_all_mines(r, c))
+            except (tk.TclError, RuntimeError):
+                # Le widget n'existe plus, ignorer l'erreur
                 pass
         
-        # Pour la bombe cliquée, exploser immédiatement
+        # Pour la bombe cliquée, exploser immédiatement et arrêter le chrono
         if immediate:
-            btn.config(text=explosion_stages[0], bg="red")
-            self.root.after(300, show_explosion)
-            self.root.after(1000, lambda: self.reveal_all_mines(r, c))
+            # Arrêter le chronomètre immédiatement quand une bombe est cliquée
+            self.running = False
+            
+            # Désactiver tous les boutons immédiatement pour empêcher d'autres clics
+            self.disable_all_buttons()
+            
+            try:
+                btn.config(text=explosion_stages[0], bg="red")
+                self.root.after(300, show_explosion)
+            except (tk.TclError, RuntimeError):
+                # Le widget n'existe plus, ignorer l'erreur
+                pass
         else:
             # Pour les autres bombes, juste montrer l'explosion
-            btn.config(text=explosion_stages[1], bg="red")
+            try:
+                btn.config(text=explosion_stages[1], bg="red")
+            except (tk.TclError, RuntimeError):
+                # Le widget n'existe plus, ignorer l'erreur
+                pass
+
+    def disable_all_buttons(self):
+        """Désactive tous les boutons du plateau pour empêcher d'autres clics."""
+        try:
+            for r in range(self.rows):
+                for c in range(self.cols):
+                    # Désactiver uniquement les boutons qui ne sont pas déjà révélés
+                    if not self.board[r][c]["revealed"]:
+                        # On garde l'affichage mais on désactive les interactions
+                        # Cela permet de continuer à voir les drapeaux posés
+                        self.board[r][c]["btn"].config(state=tk.DISABLED)
+        except (tk.TclError, RuntimeError):
+            # En cas d'erreur (widgets détruits), ignorer
+            pass
 
     def reveal_all_mines(self, clicked_r, clicked_c):
         """Révèle toutes les bombes avec un délai."""
@@ -201,11 +320,19 @@ class Demineur:
         def reveal_next_mine(index=0):
             if index < len(mines_to_reveal):
                 r, c = mines_to_reveal[index]
-                self.animate_explosion(r, c)
-                self.root.after(100, reveal_next_mine, index + 1)
+                try:
+                    self.animate_explosion(r, c)
+                    self.root.after(100, reveal_next_mine, index + 1)
+                except (tk.TclError, RuntimeError):
+                    # En cas d'erreur, passer à la mine suivante
+                    reveal_next_mine(index + 1)
             else:
                 # Une fois toutes les mines révélées, terminer le jeu
-                self.root.after(500, lambda: self.game_over(False))
+                try:
+                    self.root.after(500, lambda: self.game_over(False))
+                except (tk.TclError, RuntimeError):
+                    # En cas d'erreur, ne rien faire
+                    pass
         
         reveal_next_mine()
 
