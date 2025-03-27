@@ -3,7 +3,7 @@ import random
 import time
 import sys
 
-# pygame initialization
+# Initialize pygame
 pygame.init()
 pygame.font.init()
 
@@ -20,13 +20,6 @@ COLORS = {
     1: BLUE, 2: GREEN, 3: RED, 4: (0, 0, 128),
     5: (128, 0, 0), 6: (0, 128, 128), 7: BLACK, 8: GRAY
 }
-
-BOMB_IMAGE = pygame.image.load("images/bomb.png")  # Картинка бомби
-BOMB_IMAGE = pygame.transform.scale(BOMB_IMAGE, (27, 27))  # Масштабування
-
-FLAG_IMAGE = pygame.image.load("images/flag.png")  # Картинка прапорця
-FLAG_IMAGE = pygame.transform.scale(FLAG_IMAGE, (28, 28))  # Масштабування
-
 
 class Button:
     def __init__(self, x, y, width, height, text=""):
@@ -50,19 +43,21 @@ class Cell:
         self.flag_status = 0  # 0: none, 1: flag, 2: question
         self.adjacent_mines = 0
         
-    def draw(self, surface, font):
+    def draw(self, surface, font, bomb_image, flag_image):
         color = WHITE if self.is_revealed else GRAY
         pygame.draw.rect(surface, color, self.rect)
         pygame.draw.rect(surface, BLACK, self.rect, 1)
         
         if self.is_revealed:
             if self.is_mine:
-                surface.blit(BOMB_IMAGE, self.rect.move(5, 5))
+                bomb_offset = (self.rect.width - bomb_image.get_width()) // 2
+                surface.blit(bomb_image, (self.rect.x + bomb_offset, self.rect.y + bomb_offset))
             elif self.adjacent_mines > 0:
                 text = font.render(str(self.adjacent_mines), True, COLORS[self.adjacent_mines])
                 surface.blit(text, text.get_rect(center=self.rect.center))
         elif self.flag_status == 1:
-            surface.blit(FLAG_IMAGE, self.rect.move(5, 5))
+            flag_offset = (self.rect.width - flag_image.get_width()) // 2
+            surface.blit(flag_image, (self.rect.x + flag_offset, self.rect.y + flag_offset))
         elif self.flag_status == 2:
             text = font.render("?", True, BLACK)
             surface.blit(text, text.get_rect(center=self.rect.center))
@@ -74,31 +69,36 @@ class Minesweeper:
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption("Minesweeper")
 
-        #------------------------------------------------------------------ Background
+        # Load assets
         self.background = pygame.image.load("images/backgr.jpg")
         self.background = pygame.transform.scale(self.background, self.screen.get_size())
-
-        # Add sounds and music
         self.music = pygame.mixer.music.load("sounds/background.mp3")
         self.fail_sound = pygame.mixer.Sound("sounds/failfare.mp3")
         self.click_sound = pygame.mixer.Sound("sounds/click.mp3")
         self.explosion_sound = pygame.mixer.Sound("sounds/explosion.mp3")
         self.win_sound = pygame.mixer.Sound("sounds/fanfare.mp3")
-
         pygame.mixer.music.play(-1)
         
+        # Fonts
         self.large_font = pygame.font.SysFont('Arial', 24)
         self.medium_font = pygame.font.SysFont('Arial', 20)
         self.cell_font = pygame.font.SysFont('Arial', 16)
         
+        # Game settings
         self.difficulty_levels = {
             "Easy": {"rows": 9, "columns": 9, "mines": 10},
             "Medium": {"rows": 16, "columns": 16, "mines": 40},
             "Hard": {"rows": 16, "columns": 30, "mines": 99}
         }
         
-        self.initialize_menu()
+        # Images
+        self.original_bomb_image = pygame.image.load("images/bomb.png")
+        self.original_flag_image = pygame.image.load("images/flag.png")
+        self.bomb_image = None
+        self.flag_image = None
         
+        self.initialize_menu()
+
     def initialize_menu(self):
         self.cells = []
         self.game_state = "menu"
@@ -108,7 +108,6 @@ class Minesweeper:
         ]
         
     def start_game(self, level_name):
-        self.current_level = level_name
         level = self.difficulty_levels[level_name]
         self.rows = level["rows"]
         self.columns = level["columns"]
@@ -118,19 +117,26 @@ class Minesweeper:
         self.game_running = False
         self.start_time = None
         self.victory = False
+        self.current_level = level_name
         
-        # Set up game board
+        # Calculate cell size
         max_cell_width = (self.screen_width - 40) // self.columns
         max_cell_height = (self.screen_height - 200) // self.rows
         self.cell_size = min(max_cell_width, max_cell_height, 40)
         
-        # Calculate board position
+        # Scale images based on cell size
+        bomb_size = int(self.cell_size * 0.7)
+        flag_size = int(self.cell_size * 0.8)
+        self.bomb_image = pygame.transform.scale(self.original_bomb_image, (bomb_size, bomb_size))
+        self.flag_image = pygame.transform.scale(self.original_flag_image, (flag_size, flag_size))
+        
+        # Create board
         board_width = self.columns * self.cell_size
         board_height = self.rows * self.cell_size
         self.board_x_position = (self.screen_width - board_width) // 2
         self.board_y_position = 150
         
-        # Create cells
+        # Initialize cells
         self.cells = [
             Cell(
                 self.board_x_position + column * self.cell_size, 
@@ -155,6 +161,7 @@ class Minesweeper:
         for mine_index in random.sample(possible_positions, self.total_mines):
             self.cells[mine_index].is_mine = True
             
+        # Calculate adjacent mines
         for index, cell in enumerate(self.cells):
             if not cell.is_mine:
                 row = index // self.columns
@@ -175,6 +182,9 @@ class Minesweeper:
         return count
     
     def reveal_cell(self, row, column):
+        if not (0 <= row < self.rows and 0 <= column < self.columns):
+            return
+            
         cell_index = row * self.columns + column
         cell = self.cells[cell_index]
         
@@ -190,15 +200,15 @@ class Minesweeper:
         cell.is_revealed = True
         
         if cell.is_mine:
-            self.end_game(False)
             self.explosion_sound.play()
             self.fail_sound.play()
+            self.end_game(False)
         elif cell.adjacent_mines == 0:
             self.reveal_adjacent_cells(row, column)
         
         if self.check_win_condition():
-            self.end_game(True)
             self.win_sound.play()
+            self.end_game(True)
 
     def reveal_adjacent_cells(self, row, column):
         for row_offset in [-1, 0, 1]:
@@ -211,13 +221,15 @@ class Minesweeper:
                     self.reveal_cell(new_row, new_column)
 
     def toggle_flag(self, row, column):
+        if not (0 <= row < self.rows and 0 <= column < self.columns):
+            return
+            
         cell_index = row * self.columns + column
         cell = self.cells[cell_index]
         
         if cell.is_revealed:
             return
             
-        # Cycle through flag states: none → flag → question → none
         if cell.flag_status == 0 and self.remaining_flags > 0:
             cell.flag_status = 1
             self.remaining_flags -= 1
@@ -237,23 +249,40 @@ class Minesweeper:
         self.game_running = False
         self.game_state = "game_over"
         self.victory = victory
-        for cell in self.cells:
-            if cell.is_mine:
-                cell.is_revealed = True
+        
+        if not victory:
+            # Find clicked bomb
+            clicked_row, clicked_col = -1, -1
+            for i, cell in enumerate(self.cells):
+                if cell.is_mine and cell.is_revealed:
+                    clicked_row = i // self.columns
+                    clicked_col = i % self.columns
+                    break
+            
+            # Prepare mines for animation
+            self.mines_to_reveal = [
+                (row, col) 
+                for row in range(self.rows) 
+                for col in range(self.columns) 
+                if self.cells[row * self.columns + col].is_mine 
+                and not (row == clicked_row and col == clicked_col)
+            ]
+            self.current_mine_index = 0
+            pygame.time.set_timer(pygame.USEREVENT, 100)
+        else:
+            for cell in self.cells:
+                if cell.is_mine:
+                    cell.is_revealed = True
 
     def draw_info_panel(self):
-        # Information panel
         pygame.draw.rect(self.screen, VIOLET, (0, 0, self.screen_width, 80))
         
-        # Timer
         timer_text = f"Time: {int(time.time() - self.start_time)}s" if self.game_running else "Time: 0s"
         self.screen.blit(self.large_font.render(timer_text, True, WHITE), (50, 30))
         
-        # Mines left
         mines_text = f"Mines: {self.total_mines}"
         self.screen.blit(self.large_font.render(mines_text, True, WHITE), (300, 30))
         
-        # Flags left
         flags_text = f"Flags: {self.remaining_flags}"
         self.screen.blit(self.large_font.render(flags_text, True, WHITE), (550, 30))
 
@@ -267,19 +296,13 @@ class Minesweeper:
 
     def draw_game(self):
         self.screen.fill(VIOLET)
-        
-        # Information panel
         self.draw_info_panel()
-        
-        # Buttons
         self.restart_button.draw(self.screen)
         self.menu_button.draw(self.screen)
         
-        # Game board
         for cell in self.cells:
-            cell.draw(self.screen, self.cell_font)
+            cell.draw(self.screen, self.cell_font, self.bomb_image, self.flag_image)
         
-        # Game over screen
         if self.game_state == "game_over":
             result_text = "You Win!" if self.victory else "Game Over!"
             self.screen.blit(self.large_font.render(result_text, True, RED), (350, 100))
@@ -289,7 +312,17 @@ class Minesweeper:
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-                
+            
+            if event.type == pygame.USEREVENT and hasattr(self, 'mines_to_reveal'):
+                if self.current_mine_index < len(self.mines_to_reveal):
+                    row, col = self.mines_to_reveal[self.current_mine_index]
+                    cell_index = row * self.columns + col
+                    if 0 <= cell_index < len(self.cells):  # Додано перевірку індексу
+                        self.cells[cell_index].is_revealed = True
+                    self.current_mine_index += 1
+                else:
+                    pygame.time.set_timer(pygame.USEREVENT, 0)
+            
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_position = pygame.mouse.get_pos()
                 self.click_sound.play()
@@ -309,12 +342,10 @@ class Minesweeper:
                             if cell.rect.collidepoint(mouse_position):
                                 row = cell_index // self.columns
                                 column = cell_index % self.columns
-                                if event.button == 1:  # Left click
+                                if event.button == 1:
                                     self.reveal_cell(row, column)
-                                    self.click_sound.play()
-                                elif event.button == 3:  # Right click
+                                elif event.button == 3:
                                     self.toggle_flag(row, column)
-                                    self.click_sound.play()
 
     def run(self):
         clock = pygame.time.Clock()

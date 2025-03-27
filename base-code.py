@@ -1,6 +1,7 @@
 import tkinter as tk
 import random
 import time
+from PIL import Image, ImageTk  # Pour les animations plus avancées (optionnel)
 
 class Demineur:
     def __init__(self, root):
@@ -124,7 +125,7 @@ class Demineur:
             self.board[r][c]["mine"] = True
 
     def reveal(self, r, c):
-        """Révèle une case et applique les règles du jeu."""
+        """Révèle une case et applique les règles du jeu avec animation."""
         if self.first_click:
             self.place_mines(r, c)
             self.first_click = False
@@ -138,18 +139,85 @@ class Demineur:
         self.board[r][c]["btn"].config(relief=tk.SUNKEN)
 
         if self.board[r][c]["mine"]:
-            self.board[r][c]["btn"].config(text="💣", bg="red")
-            self.game_over(False)
+            # Animation d'explosion pour la bombe cliquée
+            self.animate_explosion(r, c, immediate=True)
+            self.disable_all_interactions()  # Désactiver toutes les interactions après avoir cliqué sur une bombe
             return
 
+        # Animation de dissipation du nuage pour les chiffres
         mines_adj = self.count_adjacent_mines(r, c)
         if mines_adj > 0:
-            self.board[r][c]["btn"].config(text=str(mines_adj))
+            self.animate_reveal(r, c, mines_adj)
         else:
+            # Pas d'animation pour les cases vides
+            self.board[r][c]["btn"].config(text="")
             self.reveal_adjacent(r, c)
 
         if self.check_win():
             self.game_over(True)
+
+    def disable_all_interactions(self):
+        """Désactive toutes les interactions après avoir cliqué sur une bombe."""
+        for r in range(self.rows):
+            for c in range(self.cols):
+                btn = self.board[r][c]["btn"]
+                btn.config(state=tk.DISABLED)
+                btn.unbind("<Button-1>")  # Désactiver les clics gauche
+                btn.unbind("<Button-3>")  # Désactiver les clics droit
+
+    def animate_reveal(self, r, c, mines_adj):
+        """Anime la dissipation d'un nuage pour révéler le chiffre."""
+        btn = self.board[r][c]["btn"]
+        # Séquence d'animation: nuage qui se dissipe graduellement
+        cloud_stages = ["☁️", "🌫️", "💨", str(mines_adj)]
+        
+        def show_next_stage(stage_index=0):
+            if stage_index < len(cloud_stages):
+                btn.config(text=cloud_stages[stage_index])
+                self.root.after(150, show_next_stage, stage_index + 1)
+        
+        show_next_stage()
+
+    def animate_explosion(self, r, c, immediate=False):
+        """Anime l'explosion d'une bombe."""
+        btn = self.board[r][c]["btn"]
+        # Séquence d'animation: explosion
+        explosion_stages = ["💣", "💥"]
+        
+        def show_explosion():
+            btn.config(text=explosion_stages[1], bg="red")
+            if not immediate:
+                # Si ce n'est pas la bombe cliquée directement, jouer un son serait approprié ici
+                pass
+        
+        # Pour la bombe cliquée, exploser immédiatement
+        if immediate:
+            btn.config(text=explosion_stages[0], bg="red")
+            self.root.after(300, show_explosion)
+            self.root.after(1000, lambda: self.reveal_all_mines(r, c))
+        else:
+            # Pour les autres bombes, juste montrer l'explosion
+            btn.config(text=explosion_stages[1], bg="red")
+
+    def reveal_all_mines(self, clicked_r, clicked_c):
+        """Révèle toutes les bombes avec un délai."""
+        mines_to_reveal = []
+        for r in range(self.rows):
+            for c in range(self.cols):
+                if self.board[r][c]["mine"] and not (r == clicked_r and c == clicked_c):
+                    mines_to_reveal.append((r, c))
+        
+        # Révéler les mines une par une avec un délai
+        def reveal_next_mine(index=0):
+            if index < len(mines_to_reveal):
+                r, c = mines_to_reveal[index]
+                self.animate_explosion(r, c)
+                self.root.after(100, reveal_next_mine, index + 1)
+            else:
+                # Une fois toutes les mines révélées, terminer le jeu
+                self.root.after(500, lambda: self.game_over(False))
+        
+        reveal_next_mine()
 
     def count_adjacent_mines(self, r, c):
         """Compte le nombre de mines adjacentes à une case donnée."""
@@ -179,56 +247,53 @@ class Demineur:
         new_flag = (current_flag + 1) % 3  # Cycle entre 0 (vide), 1 (drapeau), 2 (point d'interrogation)
         self.board[r][c]["flag"] = new_flag
 
-        # Mettre à jour le texte du bouton
-        symbols = ["", "🚩", "?"]
-        self.board[r][c]["btn"].config(text=symbols[new_flag])
-
-        # Mettre à jour les compteurs
-        if current_flag == 0 and new_flag == 1:  # Vide → Drapeau
+        if new_flag == 1:
             self.flags_count += 1
-        elif current_flag == 1 and new_flag == 2:  # Drapeau → Point d'interrogation
-            self.flags_count -= 1
+        elif new_flag == 2:
             self.question_marks_count += 1
-        elif current_flag == 2 and new_flag == 0:  # Point d'interrogation → Vide
-            self.question_marks_count -= 1
+        else:
+            if current_flag == 1:
+                self.flags_count -= 1
+            elif current_flag == 2:
+                self.question_marks_count -= 1
+        
+        self.update_flags()
 
-        # Mettre à jour les labels
-        self.update_labels()
+    def update_flags(self):
+        """Met à jour l'affichage des drapeaux et des points d'interrogation."""
+        self.flags_label.config(text=f"Drapeaux: {self.flags_count}")
+        self.questions_label.config(text=f"Points d'interrogation: {self.question_marks_count}")
 
     def check_win(self):
-        """Vérifie si toutes les cases non minées sont révélées."""
+        """Vérifie si l'utilisateur a gagné."""
         for r in range(self.rows):
             for c in range(self.cols):
-                if not self.board[r][c]["mine"] and not self.board[r][c]["revealed"]:
+                if not self.board[r][c]["revealed"] and not self.board[r][c]["mine"]:
                     return False
         return True
 
     def game_over(self, won):
         """Affiche le résultat et arrête le jeu."""
         self.running = False
-        for r in range(self.rows):
-            for c in range(self.cols):
-                if self.board[r][c]["mine"]:
-                    self.board[r][c]["btn"].config(text="💣")
-                self.board[r][c]["btn"].config(state=tk.DISABLED)
-
+        if won:
+            for r in range(self.rows):
+                for c in range(self.cols):
+                    if self.board[r][c]["mine"]:
+                        self.board[r][c]["btn"].config(text="💣")
+        # Désactiver tous les boutons et empêcher les clics
+        self.disable_all_interactions()
+        
         message = "Victoire ! 🎉" if won else "Perdu... 💥"
         self.timer_label.config(text=message)
 
     def update_timer(self):
-        """Mise à jour du chronomètre."""
-        if self.running and self.start_time:
+        """Met à jour le chronomètre en temps réel."""
+        if self.running:
             elapsed_time = int(time.time() - self.start_time)
             self.timer_label.config(text=f"Temps: {elapsed_time}s")
-        self.root.after(1000, self.update_timer)
-
-    def update_labels(self):
-        """Met à jour les labels des mines, drapeaux et points d'interrogation."""
-        self.flags_label.config(text=f"Drapeaux: {self.flags_count}")
-        self.questions_label.config(text=f"Points d'interrogation: {self.question_marks_count}")
-        self.mines_label.config(text=f"Mines: {self.mines_count - self.flags_count}")
+            self.root.after(1000, self.update_timer)
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = Demineur(root)
+    game = Demineur(root)
     root.mainloop()
